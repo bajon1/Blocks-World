@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from .block_state import BlocksState
+from .block_state import BlockState
 
 
 class Variant(Enum):
@@ -11,6 +11,6 @@ class Variant(Enum):
 
 @dataclass(frozen=True, slots=True)
 class BlocksProblem:
-    start: BlocksState
-    goal: BlocksState
+    start: BlockState
+    goal: BlockState
     variant: Variant
