@@ -4,8 +4,8 @@ version = "0.1.0"
 description = "Problem przekształcenia początkowego układu klocków w docelowy za pomocą dozwolonych ruchów, przy minimalizacji ich liczby."
 readme = "README.md"
 authors = [
-    {   name = "Dominik Mika", email = "dmika@student.agh.edu.pl",
-        name = "Piotr Matusiewicz", email = "piotrek.matusiewicz@gmail.com" }
+    { name = "Dominik Mika", email = "dmika@student.agh.edu.pl" },
+    { name = "Piotr Matusiewicz", email = "piotrek.matusiewicz@gmail.com" },
 ]
 requires-python = ">=3.13"
 dependencies = []
