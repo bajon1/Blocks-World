@@ -1,0 +1,18 @@
+[project]
+name = "blocks-world"
+version = "0.1.0"
+description = "Problem przekształcenia początkowego układu klocków w docelowy za pomocą dozwolonych ruchów, przy minimalizacji ich liczby."
+readme = "README.md"
+authors = [
+    {   name = "Dominik Mika", email = "dmika@student.agh.edu.pl",
+        name = "Piotr Matusiewicz", email = "piotrek.matusiewicz@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = false
