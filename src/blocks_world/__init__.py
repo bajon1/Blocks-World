@@ -5,6 +5,7 @@ import random
 from .generator import generate_problems
 from .block_state import BlockState
 from .problem import BlocksProblem, Variant
+from .io import read_problems
 
 
 def problems() -> None:
@@ -19,18 +20,7 @@ def problems() -> None:
 
     args = parser.parse_args()
 
-    for line in args.path.read_text(encoding="utf-8").splitlines():
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-
-        start, goal = line.split(",", maxsplit=1)
-
-        problem = BlocksProblem(
-            start=BlockState(tuple(map(int, start.split()))),
-            goal=BlockState(tuple(map(int, goal.split()))),
-            variant=args.variant,
-        )
-
+    for problem in read_problems(args.path, args.variant):
         print(problem)
 
 def generate() -> None:

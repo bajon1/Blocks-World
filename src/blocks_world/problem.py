@@ -36,7 +36,12 @@ class BlocksProblem:
 class SearchResult:
     """Results of a search.
     moves: list[Move] - list of done moves
-    n_moves: int - number of moves
+    visited: int - number of visited nodes
     """
     moves: list[Move]
-    n_moves: int
+    visited: int
+    is_solved:bool
+
+    @property
+    def n_moves(self) -> int:
+        return len(self.moves)
