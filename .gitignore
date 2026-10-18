@@ -3,3 +3,5 @@
 .venv
 *.pdf
 *.iml
+.uv-cache
+_data*
