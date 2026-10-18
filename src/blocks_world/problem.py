@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
 
-from .block_state import BlocksState
+from .block_state import BlockState
+
+if TYPE_CHECKING:
+    from .moves import Move
 
 
 class Variant(Enum):
@@ -22,6 +28,15 @@ class BlocksProblem:
     Goal state
     Problem variant
     """
-    start: BlocksState
-    goal: BlocksState
+    start: BlockState
+    goal: BlockState
     variant: Variant
+
+@dataclass(slots=True)
+class SearchResult:
+    """Results of a search.
+    moves: list[Move] - list of done moves
+    n_moves: int - number of moves
+    """
+    moves: list[Move]
+    n_moves: int
