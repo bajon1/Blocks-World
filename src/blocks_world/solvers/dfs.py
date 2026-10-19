@@ -7,12 +7,10 @@ from ..moves import Move, apply_move, generate_moves
 from ..problem import BlocksProblem, SearchResult
 
 
-def dfs(
-        problem: BlocksProblem,
-        *,
-        max_expanded: int = 1_000_000,
+def dfs(problem: BlocksProblem,
+        *, max_expanded: int = 1_000_000,
         ) -> SearchResult:
-    """Run the iterative graph DFS implemented for the basic variant."""
+
     if max_expanded < 1:
         raise ValueError("max_expanded must be positive")
 
