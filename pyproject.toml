@@ -13,8 +13,9 @@ dependencies = [
 ]
 
 [project.scripts]
-b-generate = "blocks_world:generate"
-b-problems = "blocks_world:problems"
+b-generate = "blocks_world.cli:generate_main"
+b-problems = "blocks_world.cli:problem_main"
+b-solve = "blocks_world.cli:solve_main"
 
 [build-system]
 requires = ["uv_build>=0.13.1,<0.14.0"]

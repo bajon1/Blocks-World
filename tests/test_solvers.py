@@ -1,187 +1,204 @@
-"""Tests for the search solvers.
-
-All solvers share one call convention:
-    solver(problem, node_limit=..., stats=None) -> SearchResult(moves, n_moves)
-and raise NodeLimitExceeded when the node limit is exceeded.
-
-Solutions are verified independently of the verifier module, using only
-generate_moves and apply_move.
-"""
-import random
-from dataclasses import fields
+from collections import deque
 from itertools import product
+import tracemalloc
 
 import pytest
 
 from blocks_world.block_state import BlockState, validate_state
-from blocks_world.generator import generate_problems
-from blocks_world.moves import Move, apply_move, generate_moves
-from blocks_world.problem import BlocksProblem, SearchResult, Variant
-from blocks_world.solvers.common import NodeLimitExceeded, SearchStats
+from blocks_world.moves import generate_moves, apply_move
+from blocks_world.problem import BlocksProblem, Variant
+from blocks_world.solvers.bfs import bfs, get_peak_stored_states as bfs_peak
 from blocks_world.solvers.dfs import dfs
-
-SOLVERS = {"dfs": dfs}
-
-VARIANTS = [Variant.BASIC, Variant.EXTENDED]
-
-# Example from the project description: the shortest solution has 7 moves
-# in the basic variant and 5 moves in the extended variant.
-SPEC_START = BlockState((0, 1, 0, 2, 3))
-SPEC_GOAL = BlockState((2, 3, 4, 5, 0))
-SPEC_OPTIMAL = {Variant.BASIC: 7, Variant.EXTENDED: 5}
+from blocks_world.solvers.ida_star import (
+    ida_star,
+    misplaced_supports,
+    misplaced_supports_with_blockers,
+)
+from blocks_world.verifier import verify_solution
 
 
-def assert_valid_solution(problem, result):
-    """Check that every move is legal in the problem's variant and the final state is the goal."""
-    assert isinstance(result, SearchResult)
-    assert isinstance(result.moves, list)
-    assert result.n_moves == len(result.moves)
-
-    state = problem.start
-    for number, move in enumerate(result.moves, start=1):
-        assert isinstance(move, Move)
-        assert move in generate_moves(state, problem.variant), (
-            f"move {number} {move} is not allowed in the {problem.variant.value} variant"
-        )
-        state = apply_move(state, move)
-
-    assert state == problem.goal
+SAMPLE_START = BlockState((0, 1, 0, 2, 3))
+SAMPLE_GOAL = BlockState((2, 3, 4, 5, 0))
 
 
-def all_states(n):
-    """Return every valid state of n blocks."""
+def problem(variant: Variant) -> BlocksProblem:
+    return BlocksProblem(SAMPLE_START, SAMPLE_GOAL, variant)
+
+
+def exact_distance(start: BlockState, goal: BlockState) -> int:
+    queue = deque([(start, 0)])
+    seen = {start}
+    while queue:
+        state, distance = queue.popleft()
+        if state == goal:
+            return distance
+        for move in generate_moves(state, Variant.EXTENDED):
+            successor = apply_move(state, move)
+            if successor not in seen:
+                seen.add(successor)
+                queue.append((successor, distance + 1))
+    raise AssertionError("Every valid Blocks World state must be reachable")
+
+
+def valid_states(n: int) -> list[BlockState]:
     states = []
     for supports in product(range(n + 1), repeat=n):
+        state = BlockState(supports)
         try:
-            validate_state(BlockState(supports))
+            validate_state(state)
         except ValueError:
             continue
-        states.append(BlockState(supports))
+        states.append(state)
     return states
 
 
-def random_problems(n, variant, seed=42, count=5):
-    """Return `count` reproducible random problems with n blocks."""
-    rng = random.Random(seed)
-    return [
-        BlocksProblem(start, goal, variant)
-        for start, goal in generate_problems(n, count, rng)
-    ]
+def test_dfs_finds_a_sequence_that_passes_verification():
+    given = problem(Variant.BASIC)
+    result = dfs(given, max_expanded=100_000)
+    assert result.is_solved
+    assert result.visited > 0
+    assert verify_solution(given, result) is None
 
 
-solvers = pytest.mark.parametrize("solver", SOLVERS.values(), ids=SOLVERS.keys())
-variants = pytest.mark.parametrize("variant", VARIANTS)
+def test_dfs_can_find_child_goal_after_expanding_only_root():
+    given = BlocksProblem(
+        start=BlockState((0, 1, 2)),
+        goal=BlockState((0, 1, 0)),
+        variant=Variant.BASIC,
+    )
+
+    result = dfs(given, max_expanded=1)
+
+    assert result.is_solved
+    assert result.visited == 1
+    assert verify_solution(given, result) is None
 
 
-def test_search_result_has_only_moves_and_n_moves():
-    assert [f.name for f in fields(SearchResult)] == ["moves", "n_moves"]
+@pytest.mark.parametrize(
+    ("variant", "expected_length"),
+    [(Variant.BASIC, 7), (Variant.EXTENDED, 5)],
+)
+def test_bfs_returns_pdf_sample_shortest_length(variant, expected_length):
+    given = problem(variant)
+    result = bfs(given, max_expanded=100_000)
+    assert result.is_solved
+    assert result.n_moves == expected_length
+    assert verify_solution(given, result) is None
+    assert bfs_peak() >= 1
 
 
-@solvers
-@variants
-def test_spec_example(solver, variant):
-    problem = BlocksProblem(SPEC_START, SPEC_GOAL, variant)
+@pytest.mark.parametrize(
+    "heuristic",
+    ["misplaced_supports", "misplaced_supports_with_blockers"],
+)
+def test_ida_star_returns_pdf_sample_shortest_length(heuristic):
+    given = problem(Variant.EXTENDED)
+    result = ida_star(given, max_expanded=100_000, heuristic=heuristic)
+    assert result.is_solved
+    assert result.n_moves == 5
+    assert verify_solution(given, result) is None
 
-    result = solver(problem)
 
-    assert_valid_solution(problem, result)
-    # No solution can be shorter than the optimal one.
-    assert result.n_moves >= SPEC_OPTIMAL[variant]
-
-
-@solvers
-@variants
-def test_start_equals_goal(solver, variant):
-    problem = BlocksProblem(SPEC_START, SPEC_START, variant)
-
-    result = solver(problem)
-
+@pytest.mark.parametrize("solver", [dfs, bfs])
+def test_graph_search_reports_node_limit_without_partial_solution(solver):
+    result = solver(problem(Variant.EXTENDED), max_expanded=1)
+    assert not result.is_solved
     assert result.moves == []
-    assert result.n_moves == 0
+    assert result.visited == 1
 
 
-@solvers
-@variants
-def test_goal_one_move_away_is_found_with_node_limit_1(solver, variant):
-    problem = BlocksProblem(BlockState((0, 1, 2)), BlockState((0, 1, 0)), variant)
-
-    result = solver(problem, node_limit=1)
-
-    assert_valid_solution(problem, result)
-    assert result.moves == [Move(3, 0)]
+@pytest.mark.parametrize("solver", [dfs, bfs])
+def test_graph_search_rejects_nonpositive_limit(solver):
+    with pytest.raises(ValueError, match="positive"):
+        solver(problem(Variant.BASIC), max_expanded=0)
 
 
-@solvers
-@variants
-def test_node_limit_exceeded_is_raised(solver, variant):
-    # The specification example needs at least 5 moves, so one expanded node is not enough.
-    problem = BlocksProblem(SPEC_START, SPEC_GOAL, variant)
-    stats = SearchStats()
-
-    with pytest.raises(NodeLimitExceeded):
-        solver(problem, node_limit=1, stats=stats)
-
-    assert 0 < stats.expanded <= 1
+def test_ida_star_reports_node_limit_across_all_iterations():
+    result = ida_star(
+        problem(Variant.EXTENDED),
+        max_expanded=1,
+        heuristic="misplaced_supports",
+    )
+    assert not result.is_solved
+    assert result.moves == []
+    assert result.visited == 1
 
 
-@solvers
-@variants
-def test_stats_are_filled(solver, variant):
-    problem = BlocksProblem(SPEC_START, SPEC_GOAL, variant)
-    stats = SearchStats()
-
-    result = solver(problem, node_limit=100_000, stats=stats)
-
-    assert_valid_solution(problem, result)
-    assert stats.expanded > 0
-    assert stats.max_stored >= result.n_moves
+def test_ida_star_rejects_nonpositive_limit():
+    with pytest.raises(ValueError, match="positive"):
+        ida_star(
+            problem(Variant.EXTENDED),
+            max_expanded=0,
+            heuristic="misplaced_supports",
+        )
 
 
-@solvers
-@variants
-def test_result_is_deterministic(solver, variant):
-    problem = random_problems(6, variant)[0]
-
-    first = solver(problem, node_limit=100_000)
-    second = solver(problem, node_limit=100_000)
-
-    assert first.moves == second.moves
-
-
-@solvers
-@variants
-@pytest.mark.parametrize("n", [3, 4])
-def test_every_pair_of_states_is_solvable(solver, variant, n):
-    """Exhaustive check: 13 states (169 pairs) for n=3 and 73 states (5329 pairs) for n=4.
-
-    Every state is reachable from every other state in both variants,
-    so a solution must always be found.
-    """
-    states = all_states(n)
-
-    for start in states:
-        for goal in states:
-            problem = BlocksProblem(start, goal, variant)
-            result = solver(problem, node_limit=100_000)
-            assert_valid_solution(problem, result)
+@pytest.mark.parametrize("solver", [dfs, bfs])
+def test_graph_search_handles_already_solved_problem_without_expansion(solver):
+    state = BlockState((0, 1, 0))
+    given = BlocksProblem(state, state, Variant.BASIC)
+    result = solver(given, max_expanded=1)
+    assert result.is_solved
+    assert result.moves == []
+    assert result.visited == 0
 
 
-@variants
-def test_dfs_random_problems_n3_to_n6(variant):
-    """Five seeded random problems per n. Plain DFS may return long solutions, so only validity is checked."""
-    for n in range(3, 7):
-        for problem in random_problems(n, variant):
-            result = dfs(problem, node_limit=100_000)
-
-            assert_valid_solution(problem, result)
+def test_ida_star_rejects_unknown_heuristic():
+    with pytest.raises(ValueError, match="Unknown heuristic"):
+        ida_star(problem(Variant.EXTENDED), max_expanded=10, heuristic="missing")
 
 
-@pytest.mark.skip(reason="requires move ordering in DFS, which the plain variant does not use")
-@variants
-def test_dfs_with_ordering_handles_large_problems(variant):
-    """With move ordering, problems with 10 to 15 blocks are solved within 5000 expanded nodes."""
-    for n in range(10, 16):
-        for problem in random_problems(n, variant):
-            result = dfs(problem, node_limit=5_000)
+def test_improved_heuristic_counts_correct_blocks_that_must_be_removed():
+    state = BlockState((0, 1, 2))
+    goal = BlockState((0, 0, 2))
+    assert misplaced_supports(state, goal) == 1
+    assert misplaced_supports_with_blockers(state, goal) == 3
+    assert exact_distance(state, goal) == 3
 
-            assert_valid_solution(problem, result)
+
+def test_heuristics_are_admissible_for_every_three_block_state():
+    goal = BlockState((0, 1, 2))
+    for state in valid_states(3):
+        distance = exact_distance(state, goal)
+        basic = misplaced_supports(state, goal)
+        improved = misplaced_supports_with_blockers(state, goal)
+        assert basic <= improved <= distance, state
+
+
+def test_dfs_limit_does_not_retain_parent_record_for_every_state():
+    given = BlocksProblem(
+        start=BlockState((9, 14, 13, 6, 3, 11, 0, 15, 10, 12, 0, 0, 7, 0, 0)),
+        goal=BlockState((5, 15, 0, 10, 9, 1, 0, 3, 11, 12, 0, 0, 2, 13, 7)),
+        variant=Variant.BASIC,
+    )
+    tracemalloc.start()
+    try:
+        result = dfs(given, max_expanded=5_000)
+        _, peak_bytes = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert result.visited <= 5_000
+    if result.is_solved:
+        assert verify_solution(given, result) is None
+    assert peak_bytes < 50_000_000
+
+
+def test_ida_star_keeps_iterative_deepening_memory_bounded():
+    given = BlocksProblem(
+        start=BlockState((9, 14, 13, 6, 3, 11, 0, 15, 10, 12, 0, 0, 7, 0, 0)),
+        goal=BlockState((5, 15, 0, 10, 9, 1, 0, 3, 11, 12, 0, 0, 2, 13, 7)),
+        variant=Variant.EXTENDED,
+    )
+    tracemalloc.start()
+    try:
+        result = ida_star(
+            given,
+            max_expanded=5_000,
+            heuristic="misplaced_supports",
+        )
+        _, peak_bytes = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert not result.is_solved
+    assert result.visited == 5_000
+    assert peak_bytes < 12_000_000

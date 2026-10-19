@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import NamedTuple
 from itertools import permutations
 
@@ -9,7 +10,7 @@ class Move(NamedTuple):
     destination: int
 
 
-def generate_moves(state: BlockState, variant: Variant) -> list[Move]:
+def iter_moves(state: BlockState, variant: Variant) -> Iterator[Move]:
     state_set = set(state.state)
 
     available_blocks = [
@@ -18,21 +19,21 @@ def generate_moves(state: BlockState, variant: Variant) -> list[Move]:
         if block not in state_set
     ]
 
-    moves = []
-
-    moves.extend(
-        Move(block, 0)
+    yield from (
+        Move(block=block, destination=0)
         for block in available_blocks
         if state.state[block - 1] != 0
     )
 
-    moves.extend(
-        Move(block, destination)
+    yield from (
+        Move(block=block, destination=destination)
         for block, destination in permutations(available_blocks, 2)
         if variant == Variant.EXTENDED or state.state[block - 1] == 0
     )
 
-    return moves
+
+def generate_moves(state: BlockState, variant: Variant) -> list[Move]:
+    return list(iter_moves(state, variant))
 
 
 

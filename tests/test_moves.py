@@ -151,6 +151,17 @@ def test_basic_moves_subset_of_extended(state):
     assert basic <= extended
 
 
+def test_move_order_is_deterministic_and_table_first():
+    state = BlockState((0, 1, 0, 2, 3))
+
+    assert generate_moves(state, Variant.EXTENDED) == [
+        Move(4, 0),
+        Move(5, 0),
+        Move(4, 5),
+        Move(5, 4),
+    ]
+
+
 @pytest.mark.parametrize(
     "variant",
     [Variant.BASIC, Variant.EXTENDED],
