@@ -4,14 +4,14 @@ from pathlib import Path
 import pytest
 
 from blocks_world.block_state import BlockState
-from blocks_world.experiments import (
+from experiments.utils.experiments import (
     load_problem_set,
-    run_experiment,
     run_suite,
     write_results,
 )
+from blocks_world.runner import run_experiment
 from blocks_world.moves import Move
-from blocks_world.io import write_problem
+from blocks_world.io import write_problems
 from blocks_world.problem import BlocksProblem, SearchResult, Variant
 
 
@@ -139,20 +139,21 @@ def test_write_results_serializes_records_as_json():
 
 
 def test_load_problem_set_and_run_suite():
-    directory = Path("tests/_runtime_problem_set")
-    directory.mkdir(exist_ok=True)
+    path = Path("tests/_runtime_problem_set.txt")
     try:
-        for index, goal in enumerate(((0, 1, 0), (0, 0, 2)), start=1):
-            write_problem(
-                directory / f"problem_n03_{index:02d}.txt",
+        write_problems(
+            path,
+            [
                 BlocksProblem(
                     BlockState((0, 0, 0)),
                     BlockState(goal),
                     Variant.EXTENDED,
-                ),
-            )
+                )
+                for goal in ((0, 1, 0), (0, 0, 2))
+            ],
+        )
 
-        cases = load_problem_set(directory, Variant.EXTENDED)
+        cases = load_problem_set(path, Variant.EXTENDED)
         assert len(cases) == 2
         assert cases[0][0] == "problem_n03_01"
 
@@ -167,9 +168,7 @@ def test_load_problem_set_and_run_suite():
         ]
         assert all(record.expanded_nodes == 25 for record in records)
     finally:
-        for path in directory.glob("*"):
-            path.unlink()
-        directory.rmdir()
+        path.unlink(missing_ok=True)
 
 
 def test_run_suite_reports_each_completed_record():
@@ -193,6 +192,6 @@ def test_run_suite_reports_each_completed_record():
     assert completed == records
 
 
-def test_load_problem_set_rejects_missing_directory():
-    with pytest.raises(FileNotFoundError, match="Problem directory"):
+def test_load_problem_set_rejects_missing_file():
+    with pytest.raises(FileNotFoundError):
         load_problem_set("tests/does-not-exist", Variant.BASIC)

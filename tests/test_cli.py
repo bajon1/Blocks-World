@@ -7,13 +7,13 @@ from blocks_world.problem import SearchResult
 
 
 def test_generate_main_writes_requested_dataset(capsys):
-    path = Path("tests/problem_n03_01.txt")
+    path = Path("tests/_runtime_generated.txt")
 
     try:
         exit_code = generate_main(
             [
                 "--output",
-                "tests",
+                str(path),
                 "--seed",
                 "42",
                 "--count",

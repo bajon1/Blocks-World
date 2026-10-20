@@ -1,11 +1,8 @@
-from collections.abc import Callable, Iterable
-from dataclasses import asdict, dataclass
-import json
-from pathlib import Path
+from collections.abc import Callable
+from dataclasses import dataclass
 from time import perf_counter
 
-from .io import read_problem
-from .problem import BlocksProblem, SearchResult, Variant
+from .problem import BlocksProblem, SearchResult
 from .verifier import SolutionVerificationError, verify_solution
 
 
@@ -25,20 +22,6 @@ class ExperimentRecord:
     peak_stored_states: int | None
     elapsed_seconds: float
     verification: str
-
-
-def load_problem_set(
-    directory: str | Path,
-    variant: Variant,
-) -> list[tuple[str, BlocksProblem]]:
-    directory = Path(directory)
-    if not directory.is_dir():
-        raise FileNotFoundError(f"Problem directory does not exist: {directory}")
-
-    return [
-        (path.stem, read_problem(path, variant))
-        for path in sorted(directory.glob("problem_*.txt"))
-    ]
 
 
 def run_experiment(
@@ -94,43 +77,3 @@ def run_experiment(
         elapsed_seconds=elapsed_seconds,
         verification=verification,
     )
-
-
-def run_suite(
-    cases: Iterable[tuple[str, BlocksProblem]],
-    algorithm: str,
-    solver: Callable[[BlocksProblem], SearchResult],
-    *,
-    heuristic: str | None = None,
-    max_expanded: int | None = None,
-    on_record: Callable[[ExperimentRecord], None] | None = None,
-) -> list[ExperimentRecord]:
-    records = []
-    for case_id, problem in cases:
-        record = run_experiment(
-            case_id,
-            problem,
-            algorithm,
-            solver,
-            heuristic=heuristic,
-            max_expanded=max_expanded,
-        )
-        records.append(record)
-        if on_record is not None:
-            on_record(record)
-    return records
-
-
-def write_results(
-    path: str | Path,
-    records: Iterable[ExperimentRecord],
-) -> None:
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = [asdict(record) for record in records]
-    temporary_path = path.with_suffix(f"{path.suffix}.tmp")
-    temporary_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    temporary_path.replace(path)

@@ -7,13 +7,10 @@ import pytest
 from blocks_world.block_state import BlockState, validate_state
 from blocks_world.moves import generate_moves, apply_move
 from blocks_world.problem import BlocksProblem, Variant
-from blocks_world.solvers.bfs import bfs, get_peak_stored_states as bfs_peak
+from blocks_world.solvers.bfs import bfs
 from blocks_world.solvers.dfs import dfs
-from blocks_world.solvers.ida_star import (
-    ida_star,
-    misplaced_supports,
-    misplaced_supports_with_blockers,
-)
+from blocks_world.solvers.heuristics import foundation_blocks, misplaced_blocks
+from blocks_world.solvers.idastar import ida_star
 from blocks_world.verifier import verify_solution
 
 
@@ -84,12 +81,11 @@ def test_bfs_returns_pdf_sample_shortest_length(variant, expected_length):
     assert result.is_solved
     assert result.n_moves == expected_length
     assert verify_solution(given, result) is None
-    assert bfs_peak() >= 1
 
 
 @pytest.mark.parametrize(
     "heuristic",
-    ["misplaced_supports", "misplaced_supports_with_blockers"],
+    ["misplaced", "foundation"],
 )
 def test_ida_star_returns_pdf_sample_shortest_length(heuristic):
     given = problem(Variant.EXTENDED)
@@ -117,7 +113,7 @@ def test_ida_star_reports_node_limit_across_all_iterations():
     result = ida_star(
         problem(Variant.EXTENDED),
         max_expanded=1,
-        heuristic="misplaced_supports",
+        heuristic="misplaced",
     )
     assert not result.is_solved
     assert result.moves == []
@@ -129,7 +125,7 @@ def test_ida_star_rejects_nonpositive_limit():
         ida_star(
             problem(Variant.EXTENDED),
             max_expanded=0,
-            heuristic="misplaced_supports",
+            heuristic="misplaced",
         )
 
 
@@ -151,8 +147,8 @@ def test_ida_star_rejects_unknown_heuristic():
 def test_improved_heuristic_counts_correct_blocks_that_must_be_removed():
     state = BlockState((0, 1, 2))
     goal = BlockState((0, 0, 2))
-    assert misplaced_supports(state, goal) == 1
-    assert misplaced_supports_with_blockers(state, goal) == 3
+    assert misplaced_blocks(state, goal) == 1
+    assert foundation_blocks(state, goal) == 3
     assert exact_distance(state, goal) == 3
 
 
@@ -160,8 +156,8 @@ def test_heuristics_are_admissible_for_every_three_block_state():
     goal = BlockState((0, 1, 2))
     for state in valid_states(3):
         distance = exact_distance(state, goal)
-        basic = misplaced_supports(state, goal)
-        improved = misplaced_supports_with_blockers(state, goal)
+        basic = misplaced_blocks(state, goal)
+        improved = foundation_blocks(state, goal)
         assert basic <= improved <= distance, state
 
 
@@ -194,7 +190,7 @@ def test_ida_star_keeps_iterative_deepening_memory_bounded():
         result = ida_star(
             given,
             max_expanded=5_000,
-            heuristic="misplaced_supports",
+            heuristic="misplaced",
         )
         _, peak_bytes = tracemalloc.get_traced_memory()
     finally:

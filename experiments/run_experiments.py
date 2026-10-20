@@ -3,8 +3,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from blocks_world.cli import load_solver
-from blocks_world.experiment_plan import run_standard_experiments
-from blocks_world.experiments import write_results
+from utils.experiments import run_standard_experiments, write_results
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -14,12 +13,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--base-dir",
         type=Path,
-        default=Path("data/generated/seed_42/base"),
+        default=Path("data/generated/seed_42/base.txt"),
     )
     parser.add_argument(
         "--n8-dir",
         type=Path,
-        default=Path("data/generated/seed_42/n8_extended"),
+        default=Path("data/generated/seed_42/n8_extended.txt"),
     )
     parser.add_argument(
         "--output",
@@ -28,7 +27,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument(
         "--first-heuristic",
-        default="misplaced_supports",
+        default="misplaced",
     )
     parser.add_argument("--second-heuristic", required=True)
     parser.add_argument("--max-expanded", type=int, default=1_000_000)

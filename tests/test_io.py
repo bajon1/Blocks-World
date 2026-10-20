@@ -3,7 +3,12 @@ from pathlib import Path
 import pytest
 
 from blocks_world.block_state import BlockState
-from blocks_world.io import read_problem, read_problems, write_problem
+from blocks_world.io import (
+    read_problem,
+    read_problems,
+    write_problem,
+    write_problems,
+)
 from blocks_world.problem import BlocksProblem, Variant
 
 
@@ -96,3 +101,50 @@ def test_read_problems_keeps_single_file_compatibility(problem_path: Path):
             variant=Variant.BASIC,
         )
     ]
+
+
+def test_problem_collection_uses_one_comma_separated_case_per_line(
+    problem_path: Path,
+):
+    problem_path.write_text(
+        "2 0 0, 3 0 0\n"
+        "0 0 0, 0 0 2\n",
+        encoding="utf-8",
+    )
+
+    problems = read_problems(problem_path, Variant.BASIC)
+
+    assert problems == [
+        BlocksProblem(
+            start=BlockState((2, 0, 0)),
+            goal=BlockState((3, 0, 0)),
+            variant=Variant.BASIC,
+        ),
+        BlocksProblem(
+            start=BlockState((0, 0, 0)),
+            goal=BlockState((0, 0, 2)),
+            variant=Variant.BASIC,
+        ),
+    ]
+
+
+def test_write_problems_writes_all_cases_to_one_file(problem_path: Path):
+    problems = [
+        BlocksProblem(
+            start=BlockState((2, 0, 0)),
+            goal=BlockState((3, 0, 0)),
+            variant=Variant.BASIC,
+        ),
+        BlocksProblem(
+            start=BlockState((0, 0, 0)),
+            goal=BlockState((0, 0, 2)),
+            variant=Variant.BASIC,
+        ),
+    ]
+
+    write_problems(problem_path, problems)
+
+    assert problem_path.read_text(encoding="utf-8") == (
+        "2 0 0, 3 0 0\n"
+        "0 0 0, 0 0 2\n"
+    )

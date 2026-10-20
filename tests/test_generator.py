@@ -5,7 +5,7 @@ import pytest
 
 from blocks_world.block_state import validate_state
 from blocks_world.generator import generate_dataset, generate_problems
-from blocks_world.io import read_problem
+from blocks_world.io import read_problems
 from blocks_world.problem import Variant
 
 
@@ -53,7 +53,7 @@ def test_generate_problems_rejects_nonpositive_count(count):
 def test_generate_dataset_rejects_invalid_range(minimum, maximum, message):
     with pytest.raises(ValueError, match=message):
         generate_dataset(
-            output_dir="tests/unused-generator-output",
+                output_path="tests/unused-generator-output.txt",
             seed=42,
             count_per_n=1,
             min_blocks=minimum,
@@ -62,18 +62,12 @@ def test_generate_dataset_rejects_invalid_range(minimum, maximum, message):
         )
 
 
-def test_generate_dataset_writes_spec_format_files():
-    output_dir = Path("tests")
-    expected_paths = [
-        output_dir / "problem_n03_01.txt",
-        output_dir / "problem_n03_02.txt",
-        output_dir / "problem_n04_01.txt",
-        output_dir / "problem_n04_02.txt",
-    ]
+def test_generate_dataset_writes_one_collection_file():
+    output_path = Path("tests/_runtime_problems.txt")
 
     try:
-        paths = generate_dataset(
-            output_dir=output_dir,
+        problems = generate_dataset(
+            output_path=output_path,
             seed=42,
             count_per_n=2,
             min_blocks=3,
@@ -81,13 +75,9 @@ def test_generate_dataset_writes_spec_format_files():
             variant=Variant.BASIC,
         )
 
-        assert paths == expected_paths
-        assert all(path.exists() for path in paths)
-        assert all(
-            read_problem(path, Variant.BASIC).start
-            != read_problem(path, Variant.BASIC).goal
-            for path in paths
-        )
+        assert len(problems) == 4
+        assert output_path.exists()
+        assert len(output_path.read_text(encoding="utf-8").splitlines()) == 4
+        assert read_problems(output_path, Variant.BASIC) == problems
     finally:
-        for path in expected_paths:
-            path.unlink(missing_ok=True)
+        output_path.unlink(missing_ok=True)

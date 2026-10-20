@@ -3,7 +3,7 @@ from math import comb, factorial
 from pathlib import Path
 
 from .block_state import BlockState
-from .io import write_problem
+from .io import write_problems
 from .problem import BlocksProblem, Variant
 
 
@@ -62,13 +62,13 @@ def generate_problems(
 
 
 def generate_dataset(
-    output_dir: str | Path,
+    output_path: str | Path,
     seed: int,
     count_per_n: int,
     min_blocks: int,
     max_blocks: int,
     variant: Variant,
-) -> list[Path]:
+) -> list[BlocksProblem]:
     if count_per_n < 1:
         raise ValueError("count_per_n must be positive")
     if min_blocks < 3:
@@ -76,18 +76,16 @@ def generate_dataset(
     if max_blocks < min_blocks:
         raise ValueError("max_blocks must not be smaller than min_blocks")
 
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
-    written: list[Path] = []
+    problems: list[BlocksProblem] = []
 
     for n in range(min_blocks, max_blocks + 1):
-        for index, (start, goal) in enumerate(
-            generate_problems(n, count_per_n, rng),
-            start=1,
-        ):
-            path = output_dir / f"problem_n{n:02d}_{index:02d}.txt"
-            write_problem(path, BlocksProblem(start, goal, variant))
-            written.append(path)
+        problems.extend(
+            BlocksProblem(start, goal, variant)
+            for start, goal in generate_problems(n, count_per_n, rng)
+        )
 
-    return written
+    write_problems(output_path, problems)
+    return problems

@@ -5,10 +5,10 @@ from pathlib import Path
 import sys
 from typing import Sequence
 
-from .experiments import run_experiment
 from .generator import generate_dataset
 from .io import read_problem
 from .problem import BlocksProblem, SearchResult, Variant
+from .runner import run_experiment
 
 
 Solver = Callable[[BlocksProblem], SearchResult]
@@ -23,7 +23,7 @@ def load_solver(
     locations = {
         "dfs": ("blocks_world.solvers.dfs", "dfs"),
         "bfs": ("blocks_world.solvers.bfs", "bfs"),
-        "ida_star": ("blocks_world.solvers.ida_star", "ida_star"),
+        "ida_star": ("blocks_world.solvers.idastar", "ida_star"),
     }
     module_name, function_name = locations[algorithm]
 
@@ -79,9 +79,9 @@ def generate_main(argv: Sequence[str] | None = None) -> int:
     if args.max_blocks < args.min_blocks:
         parser.error("max-blocks must not be smaller than min-blocks")
 
-    output = args.output or Path("data/generated") / f"seed_{args.seed}"
-    paths = generate_dataset(
-        output_dir=output,
+    output = args.output or Path("data/generated") / f"seed_{args.seed}.txt"
+    problems = generate_dataset(
+        output_path=output,
         seed=args.seed,
         count_per_n=args.count,
         min_blocks=args.min_blocks,
@@ -89,7 +89,7 @@ def generate_main(argv: Sequence[str] | None = None) -> int:
         variant=Variant(args.variant),
     )
 
-    print(f"Generated {len(paths)} problems")
+    print(f"Generated {len(problems)} problems")
     print(f"Saved to: {output}")
     return 0
 

@@ -1,24 +1,25 @@
 import pytest
 from pathlib import Path
-import shutil
 
 from blocks_world.block_state import BlockState
-from blocks_world.experiment_plan import run_standard_experiments
+from experiments.utils.experiments import run_standard_experiments
 from blocks_world.generator import generate_dataset
-from blocks_world.io import write_problem
+from blocks_world.io import write_problems
 from blocks_world.problem import BlocksProblem, SearchResult, Variant
 
 
 @pytest.fixture
 def standard_dataset():
     root = Path("tests/_runtime_standard_dataset")
-    base_dir = root / "base"
-    n8_dir = root / "n8_extended"
-    shutil.rmtree(root, ignore_errors=True)
+    base_dir = root / "base.txt"
+    n8_dir = root / "n8_extended.txt"
+    root.mkdir(exist_ok=True)
     generate_dataset(base_dir, 42, 5, 3, 15, Variant.BASIC)
     generate_dataset(n8_dir, 42, 10, 8, 8, Variant.EXTENDED)
     yield base_dir, n8_dir
-    shutil.rmtree(root, ignore_errors=True)
+    base_dir.unlink(missing_ok=True)
+    n8_dir.unlink(missing_ok=True)
+    root.rmdir()
 
 
 def test_standard_experiment_plan_covers_all_required_cases(standard_dataset):
@@ -42,8 +43,8 @@ def test_standard_experiment_plan_covers_all_required_cases(standard_dataset):
         base_dir=base_dir,
         n8_dir=n8_dir,
         solver_loader=solver_loader,
-        first_heuristic="misplaced_supports",
-        second_heuristic="improved",
+        first_heuristic="misplaced",
+        second_heuristic="foundation",
         max_expanded=123,
         on_record=completed.append,
     )
@@ -66,25 +67,33 @@ def test_standard_experiment_plan_covers_all_required_cases(standard_dataset):
         ("dfs", 123, None),
         ("dfs", 123, None),
         ("bfs", 123, None),
-        ("ida_star", 123, "misplaced_supports"),
-        ("ida_star", 123, "improved"),
+        ("ida_star", 123, "misplaced"),
+        ("ida_star", 123, "foundation"),
     ]
     assert completed == records
 
 
 def test_standard_experiment_plan_rejects_incomplete_dataset():
     root = Path("tests/_runtime_incomplete_dataset")
-    base_dir = root / "base"
-    n8_dir = root / "n8"
+    base_dir = root / "base.txt"
+    n8_dir = root / "n8.txt"
     root.mkdir(exist_ok=True)
-    base_dir.mkdir()
-    n8_dir.mkdir()
     state = BlockState((0, 0, 0))
-    problem_path = base_dir / "problem_n03_01.txt"
     try:
-        write_problem(
-            problem_path,
-            BlocksProblem(state, BlockState((0, 1, 0)), Variant.BASIC),
+        write_problems(
+            base_dir,
+            [BlocksProblem(state, BlockState((0, 1, 0)), Variant.BASIC)],
+        )
+        n8_state = BlockState((0,) * 8)
+        write_problems(
+            n8_dir,
+            [
+                BlocksProblem(
+                    n8_state,
+                    BlockState((0, 1, 0, 0, 0, 0, 0, 0)),
+                    Variant.EXTENDED,
+                )
+            ],
         )
 
         with pytest.raises(ValueError, match="65 base problems"):
@@ -92,11 +101,10 @@ def test_standard_experiment_plan_rejects_incomplete_dataset():
                 base_dir=base_dir,
                 n8_dir=n8_dir,
                 solver_loader=lambda *_: None,
-                first_heuristic="misplaced_supports",
-                second_heuristic="misplaced_supports_with_blockers",
+                first_heuristic="misplaced",
+                second_heuristic="foundation",
             )
     finally:
-        problem_path.unlink(missing_ok=True)
-        base_dir.rmdir()
-        n8_dir.rmdir()
+        base_dir.unlink(missing_ok=True)
+        n8_dir.unlink(missing_ok=True)
         root.rmdir()

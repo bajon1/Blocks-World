@@ -1,13 +1,70 @@
-from collections.abc import Callable
 from collections import Counter
+from collections.abc import Callable, Iterable
+from dataclasses import asdict
+import json
 from pathlib import Path
 
-from .experiments import ExperimentRecord, load_problem_set, run_suite
-from .problem import BlocksProblem, SearchResult, Variant
+from blocks_world.io import read_problems
+from blocks_world.problem import BlocksProblem, SearchResult, Variant
+from blocks_world.runner import ExperimentRecord, run_experiment
 
 
 Solver = Callable[[BlocksProblem], SearchResult]
 SolverLoader = Callable[[str, int, str | None], Solver]
+
+
+def load_problem_set(
+    path: str | Path,
+    variant: Variant,
+) -> list[tuple[str, BlocksProblem]]:
+    problems = read_problems(path, variant)
+    counts: Counter[int] = Counter()
+    cases = []
+    for problem in problems:
+        n = len(problem.start)
+        counts[n] += 1
+        cases.append((f"problem_n{n:02d}_{counts[n]:02d}", problem))
+    return cases
+
+
+def run_suite(
+    cases: Iterable[tuple[str, BlocksProblem]],
+    algorithm: str,
+    solver: Callable[[BlocksProblem], SearchResult],
+    *,
+    heuristic: str | None = None,
+    max_expanded: int | None = None,
+    on_record: Callable[[ExperimentRecord], None] | None = None,
+) -> list[ExperimentRecord]:
+    records = []
+    for case_id, problem in cases:
+        record = run_experiment(
+            case_id,
+            problem,
+            algorithm,
+            solver,
+            heuristic=heuristic,
+            max_expanded=max_expanded,
+        )
+        records.append(record)
+        if on_record is not None:
+            on_record(record)
+    return records
+
+
+def write_results(
+    path: str | Path,
+    records: Iterable[ExperimentRecord],
+) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = [asdict(record) for record in records]
+    temporary_path = path.with_suffix(f"{path.suffix}.tmp")
+    temporary_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary_path.replace(path)
 
 
 def _validate_case_counts(
