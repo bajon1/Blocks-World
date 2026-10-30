@@ -22,6 +22,12 @@ def execute_notebook_cells() -> dict[str, object]:
     return namespace
 
 
+def test_report_contains_no_mojibake():
+    notebook_text = NOTEBOOK.read_text(encoding="utf-8")
+
+    assert not any(marker in notebook_text for marker in ("Ã", "Ä", "Å", "â"))
+
+
 def test_report_executes_against_complete_results():
     namespace = execute_notebook_cells()
 

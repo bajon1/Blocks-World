@@ -9,7 +9,12 @@ Wymagane są Python 3.13 i `uv`:
 
 ```powershell
 uv sync
+.\.venv\Scripts\Activate.ps1
 ```
+
+Po aktywacji środowiska polecenie `pytest` jest dostępne bezpośrednio.
+Jeżeli nie chcesz aktywować środowiska, każde polecenie można uruchomić
+przez `uv run`.
 
 ## Dane
 
@@ -54,6 +59,14 @@ Wyniki trafiają do `output/results.json`. Notebook wymaga kompletnych 135
 rekordów.
 
 ## Testy
+
+Po aktywacji środowiska:
+
+```powershell
+pytest
+```
+
+Bez aktywacji środowiska:
 
 ```powershell
 uv run pytest tests -q -p no:cacheprovider
