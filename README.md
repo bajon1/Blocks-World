@@ -1,6 +1,6 @@
 # Blocks World
 
-Solver for the Blocks World planning problem: transform an initial block arrangement into a goal arrangement using legal moves. Based on AGH "Projekt 1 – świat klocków" (`projekt1.pdf`, Polish assignment spec).
+Solver for the Blocks World planning problem: transform an initial block arrangement into a goal arrangement using legal moves.
 
 ## Project context
 
